@@ -26,6 +26,7 @@ import { displayPlatform, PLATFORMS } from "@/lib/platforms";
 import ProfitScoreBadge from "@/components/ProfitScoreBadge";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
+import { averageOrderCost } from "@/lib/averageOrderCost";
 
 const numberValue = (value) => {
   const parsed = Number(value);
@@ -385,6 +386,7 @@ export default function Dashboard() {
     loading: ordersLoading,
     reload: reloadOrders,
   } = useOrders();
+  const resupplyMetrics = averageOrderCost(orders);
 
   const {
     records: allExpenses = [],
@@ -1029,6 +1031,34 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+      </section>
+
+      <section aria-labelledby="home-supply-averages" className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 id="home-supply-averages" className="text-sm font-semibold">Supply Cost Averages</h2>
+            <p className="text-xs text-muted-foreground mt-1">Last 3 complete months · {resupplyMetrics.period}</p>
+          </div>
+          <Link to="/average-order-cost?period=last3" className="text-xs font-medium underline">View breakdown</Link>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Link to="/average-order-cost?period=last3" className="block rounded-3xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+            <Card className="p-4 lg:p-5 h-full">
+              <h3 className="text-xs text-muted-foreground">Average Cost per Order</h3>
+              <p className="text-2xl font-semibold mt-2">{ordersLoading || !resupplyMetrics.hasCosts ? "—" : formatMoney(resupplyMetrics.average)}</p>
+              <p className="text-xs text-muted-foreground mt-2">Recorded costs ÷ {resupplyMetrics.count} orders</p>
+            </Card>
+          </Link>
+          <Link to="/average-order-cost?period=last3" className="block rounded-3xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+            <Card className="p-4 lg:p-5 h-full">
+              <h3 className="text-xs text-muted-foreground">Average Monthly Resupply Cost</h3>
+              <p className="text-2xl font-semibold mt-2">{ordersLoading || !resupplyMetrics.hasCosts ? "—" : formatMoney(resupplyMetrics.monthly)}</p>
+              <p className="text-xs text-muted-foreground mt-2">Amount to set aside per month</p>
+            </Card>
+          </Link>
+        </div>
+        {!ordersLoading && !resupplyMetrics.count && <p className="text-xs text-muted-foreground">No orders recorded in this period yet.</p>}
+        {!ordersLoading && resupplyMetrics.missing > 0 && <p className="text-xs text-muted-foreground">{resupplyMetrics.missing} order rows are missing costs; these averages may be low. Review the breakdown to check them.</p>}
       </section>
 
       {/* SALES + PLATFORM */}

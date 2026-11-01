@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/PageHeader';
 import { useOrders } from '@/lib/useOrders';
 import { formatMoney } from '@/lib/format';
@@ -7,9 +7,10 @@ import { averageOrderCost } from '@/lib/averageOrderCost';
 
 export default function AverageOrderCost() {
   const { records, loading, reload } = useOrders();
+  const [searchParams] = useSearchParams();
   const now = new Date();
   const monthKey = date => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
-  const [month, setMonth] = useState(() => monthKey(new Date(now.getFullYear(), now.getMonth()-1, 1)));
+  const [month, setMonth] = useState(() => searchParams.get('period') === 'last3' ? '' : monthKey(new Date(now.getFullYear(), now.getMonth()-1, 1)));
   const monthKeys = new Set(records.map(order => String(order.sale_date || '').slice(0,7)).filter(value => /^\d{4}-(0[1-9]|1[0-2])$/.test(value)));
   for (let i = 0; i <= now.getMonth(); i++) monthKeys.add(monthKey(new Date(now.getFullYear(),i,1)));
   monthKeys.add(monthKey(new Date(now.getFullYear(),now.getMonth()-1,1)));
