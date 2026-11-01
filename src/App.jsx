@@ -16,6 +16,7 @@ import IndependentRegister from '@/pages/IndependentRegister';
 import Layout from '@/components/Layout';
 import Taxes from '@/pages/Taxes';
 import Reports from '@/pages/Reports';
+import AverageOrderCost from '@/pages/AverageOrderCost';
 import BusinessPlan from '@/pages/BusinessPlan';
 import { Navigate } from 'react-router-dom';
 import { ThemeProvider } from "next-themes";
@@ -135,6 +136,7 @@ const AuthenticatedApp = () => {
           <Route path="/expenses" element={<TabShell />} />
           <Route path="/taxes" element={<Taxes />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/average-order-cost" element={<AverageOrderCost />} />
           <Route path="/planning" element={<BusinessPlan />} />
           <Route path="/account" element={<Account />} />
           <Route path="/send-sale" element={<MobileSaleCapture />} />
