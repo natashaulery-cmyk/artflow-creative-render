@@ -24,3 +24,17 @@ test('unknown sizes and missing costs remain visible without invented estimates'
  assert.equal(result.missing,2);assert.equal(result.hasCosts,false);assert.equal(result.sizes[0].size,'Size not recorded');
  assert.equal(calculate([],new Date(2026,0,1)).count,0);
 });
+test('monthly selection isolates a month and does not divide its reserve by three',()=>{
+ const orders=[row('a','5x7',6,{sale_date:'2026-09-30'}),row('b','8x10',12,{sale_date:'2026-10-01'}),row('c','8x10',18,{sale_date:'2026-10-31'}),row('d','5x7',100,{sale_date:'2026-11-01'})];
+ const september=calculate(orders,now,'2026-09');
+ const october=calculate(orders,now,'2026-10');
+ assert.equal(september.total,6);assert.equal(october.total,30);assert.equal(october.monthly,30);
+ assert.equal(october.average,15);assert.equal(october.sizes[0].monthly,30);assert.equal(october.period,'October 2026');
+ assert.equal(calculate(orders,now,'2026-08').hasCosts,false);
+});
+test('monthly views cross year boundaries and reject invalid month input',()=>{
+ const orders=[row('a','5x7',9,{sale_date:'2025-12-31'}),row('b','5x7',6,{sale_date:'2026-01-01'})];
+ assert.equal(calculate(orders,new Date(2026,1,1),'2025-12').total,9);
+ assert.equal(calculate(orders,new Date(2026,1,1),'2026-01').total,6);
+ assert.equal(calculate(orders,new Date(2026,1,1),'2026-13').total,15);
+});
