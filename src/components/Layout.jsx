@@ -44,6 +44,7 @@ const navItems = [
   { label: "Expenses", to: "/expenses", icon: Receipt },
   { label: "Inventory", to: "/inventory", icon: Package },
   { label: "Reports", to: "/reports", icon: BarChart3 },
+  { label: "Average Order Cost", to: "/average-order-cost", icon: BarChart3 },
   { label: "Business Plan", to: "/planning", icon: Target },
   { label: "Taxes", to: "/taxes", icon: Percent },
   { label: "Mileage", to: "/mileage", icon: Car },

@@ -24,6 +24,7 @@ const primary = [
 
 const more = [
   { label: "Reports", to: "/reports", icon: BarChart3 },
+  { label: "Average Order Cost", to: "/average-order-cost", icon: BarChart3 },
   { label: "Mileage", to: "/mileage", icon: Car },
   { label: "Products", to: "/store-products", icon: Palette },
   { label: "Taxes", to: "/taxes", icon: Calculator },
