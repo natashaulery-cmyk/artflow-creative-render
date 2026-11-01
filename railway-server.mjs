@@ -110,7 +110,8 @@ async function handleApi(req, res, route, url) {
     if (route.includes('/')) return res.status(404).json({ error: 'Not found' });
     // Do not use the old Vercel proxy after changing hosts.
     if (route === 'mobile-listing-proxy') route = 'mobile-listing-sync';
-    if (!['GET', 'HEAD'].includes(req.method) && !streamRoutes.has(route)) {
+    // The Better Auth Node handler must receive the untouched request body stream.
+    if (!['GET', 'HEAD'].includes(req.method) && !streamRoutes.has(route) && route !== 'better-auth') {
       req.body = await parseBody(req);
     }
   }
