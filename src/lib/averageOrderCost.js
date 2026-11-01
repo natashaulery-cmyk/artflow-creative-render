@@ -2,14 +2,17 @@ const sizeLabel = value => String(value || '').trim().toLowerCase()
   .replace(/[×✕]/g, 'x').replace(/\s*x\s*/g, 'x').replace(/\s+/g, ' ') || 'Size not recorded';
 const key = date => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-01`;
 const emptyGroup = size => ({ size, total: 0, missing: 0, rows: 0, ids: new Set() });
-const summarize = group => ({ size: group.size, total: group.total,
+const summarize = (group, months = 3) => ({ size: group.size, total: group.total,
   count: group.ids.size, average: group.ids.size ? group.total/group.ids.size : 0,
-  monthly: group.total/3, missing: group.missing, hasCosts: group.rows > group.missing });
+  monthly: group.total/months, missing: group.missing, hasCosts: group.rows > group.missing });
 
 // Completed months keep a partial current month from depressing the reserve.
-export function averageOrderCost(orders, now = new Date()) {
-  const end = new Date(now.getFullYear(), now.getMonth(), 1);
-  const start = new Date(now.getFullYear(), now.getMonth()-3, 1);
+export function averageOrderCost(orders, now = new Date(), month = '') {
+  const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? month : '';
+  const [year, monthNumber] = selectedMonth ? selectedMonth.split('-').map(Number) : [];
+  const end = selectedMonth ? new Date(year, monthNumber, 1) : new Date(now.getFullYear(), now.getMonth(), 1);
+  const start = selectedMonth ? new Date(year, monthNumber-1, 1) : new Date(now.getFullYear(), now.getMonth()-3, 1);
+  const months = selectedMonth ? 1 : 3;
   const totals = emptyGroup('All sizes');
   const sizes = new Map();
   const seen = new Set();
@@ -32,7 +35,7 @@ export function averageOrderCost(orders, now = new Date()) {
       else group.missing++;
     }
   }
-  return { ...summarize(totals), sizes: [...sizes.values()].map(summarize)
+  return { ...summarize(totals, months), sizes: [...sizes.values()].map(group => summarize(group, months))
     .sort((a,b)=>a.size.localeCompare(b.size,undefined,{numeric:true})),
-    period: `${start.toLocaleDateString(undefined,{month:'short',year:'numeric'})} – ${new Date(end.getFullYear(),end.getMonth(),0).toLocaleDateString(undefined,{month:'short',year:'numeric'})}` };
+    period: selectedMonth ? start.toLocaleDateString(undefined,{month:'long',year:'numeric'}) : `${start.toLocaleDateString(undefined,{month:'short',year:'numeric'})} – ${new Date(end.getFullYear(),end.getMonth(),0).toLocaleDateString(undefined,{month:'short',year:'numeric'})}` };
 }
