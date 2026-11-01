@@ -1,0 +1,27 @@
+# Render staging only. Review charges before approving any paid compute.
+# Deploy from the render-migration GitHub branch. Do not switch production DNS.
+services:
+  - type: web
+    name: artflow-creative-staging
+    runtime: docker
+    plan: free
+    branch: render-migration
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /_health
+    autoDeployTrigger: off
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: BETTER_AUTH_SECRET
+        sync: false
+      - key: BETTER_AUTH_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+# Other integrations (Gmail, eBay, Resend, Yahoo, etc.) require additional
+# secret variables after the base app has been tested.
+# Cron jobs are deliberately not created during the first staging deploy.
+# Re-enable only after cutover to avoid duplicate order ingestion.
