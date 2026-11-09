@@ -13,6 +13,7 @@ import {
   BarChart3,
   Target,
   Calculator,
+  Wallet,
 } from "lucide-react";
 
 const primary = [
@@ -23,6 +24,7 @@ const primary = [
 ];
 
 const more = [
+  { label: "Budget", to: "/budget", icon: Wallet },
   { label: "Reports", to: "/reports", icon: BarChart3 },
   { label: "Average Order Cost", to: "/average-order-cost", icon: BarChart3 },
   { label: "Mileage", to: "/mileage", icon: Car },
