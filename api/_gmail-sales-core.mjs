@@ -117,10 +117,10 @@ function vintedRows(subject, text) {
 
 function poshmarkRows(subject, text) {
   const normalizedSubject = clean(subject).replace(/^(?:(?:fwd?|fw):\s*)+/i, '');
-  const subjectMatch = normalizedSubject.match(/[\"“]([\s\S]+?)[\"”]\s+just sold to\s+@([^\s!]+)\s+on Poshmark!/i);
+  const subjectMatch = normalizedSubject.match(/^(?:Congrats!\s*)?(.+?)\s+just sold to\s+@([^\s!]+)\s+on Poshmark!\s*$/i);
   if (!subjectMatch) return [];
 
-  const title = clean(subjectMatch[1]);
+  const title = clean(subjectMatch[1]).replace(/^["“]|["”]$/g, '').trim();
   const buyer = clean(subjectMatch[2]);
   const orderId = clean(text.match(/Order\s*ID\s*(?:\n|:)?\s*([a-z0-9-]+)/i)?.[1] || '');
   const itemBlock = text.match(/Item\s+(?:Price\s*)?([\s\S]*?)(?:Your Earnings|Sales tax|Packaging Reminder)/i)?.[1] || '';
@@ -676,26 +676,31 @@ export const GMAIL_QUERIES = [
 ];
 
 async function listMessageIds(accessToken) {
-  const ids = new Set();
+  // A short, rotating search across marketplaces keeps one busy marketplace
+  // from consuming the full Gmail request budget before others are checked.
+  const groups = [];
   for (const query of GMAIL_QUERIES) {
+    const ids = [];
     let pageToken = '';
-    // The first run is a true historical backfill. Later runs skip message IDs
-    // already represented by a complete order, so a five-minute refresh does
-    // not repeatedly download the full mailbox history.
-    for (let page = 0; page < 20; page += 1) {
+    for (let page = 0; page < 2; page += 1) {
       const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
       url.searchParams.set('q', query);
       url.searchParams.set('maxResults', '100');
       if (pageToken) url.searchParams.set('pageToken', pageToken);
       const data = await googleJson(accessToken, url);
-      for (const message of data?.messages || []) if (message?.id) ids.add(message.id);
+      for (const message of data?.messages || []) if (message?.id) ids.push(message.id);
       pageToken = clean(data?.nextPageToken || '');
       if (!pageToken) break;
     }
+    groups.push(ids);
   }
-  return [...ids];
+  const messageIds = new Set();
+  const maxLength = Math.max(0, ...groups.map((group) => group.length));
+  for (let i = 0; i < maxLength; i += 1) {
+    for (const group of groups) if (group[i]) messageIds.add(group[i]);
+  }
+  return [...messageIds];
 }
-
 async function readMessage(accessToken, messageId) {
   const url = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}`);
   url.searchParams.set('format', 'full');
@@ -973,12 +978,22 @@ export async function syncGmailAccount(client, business, accessToken, { force = 
      WHERE COALESCE(message_id,'')<>''
   `, [business.base44_id]);
   const completedIds = new Set(completed.rows.map((row) => clean(row.message_id)).filter(Boolean));
-  // Bound each run so a historical backfill stays within Gmail quota while
-  // still catching up a seller's full history in far fewer manual refreshes.
+  // New sale emails take priority over older orders needing image repairs.
+  // Keep each refresh small enough to stay within Gmail's per-user quota.
+  const existingMessages = await client.query(`
+    SELECT DISTINCT split_part(source_email_id, ':', 1) AS message_id
+      FROM artflow.orders
+     WHERE business_id=$1
+       AND sync_source='gmail_direct_sales'
+       AND COALESCE(source_email_id,'')<>''
+  `, [business.base44_id]);
+  const existingIds = new Set(existingMessages.rows.map((row) => clean(row.message_id)).filter(Boolean));
+  const freshIds = messageIds.filter((id) => !existingIds.has(id) && !completedIds.has(id));
   const pendingMessageIds = Array.from(new Set([
+    ...freshIds,
     ...repairMessageIds,
-    ...messageIds.filter((messageId) => !completedIds.has(messageId)),
-  ])).slice(0, force ? 600 : 200);
+    ...messageIds.filter((id) => !completedIds.has(id)),
+  ])).slice(0, force ? 40 : 30);
   result.scanned = pendingMessageIds.length;
   for (let index = 0; index < pendingMessageIds.length; index += 10) {
     const batchIds = pendingMessageIds.slice(index, index + 10);
