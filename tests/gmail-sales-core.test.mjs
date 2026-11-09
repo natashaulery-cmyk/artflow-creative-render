@@ -57,6 +57,39 @@ test('parses a flattened Poshmark sold email with size before price', () => {
   assert.equal(rows[0].unit_price, 10);
 });
 
+test('parses current unquoted Poshmark sold email subjects', () => {
+  const rows = parseSaleEmail(
+    'Poshmark <orders@poshmark.com>',
+    '10x8 Framed Swirling Night Wall Art just sold to @thehappy186 on Poshmark!',
+    'Order ID 6bc49c2e8da91b8c0d4d9aff0\nItem Price $12.00\nYour Earnings $9.05'
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].product_name, '10x8 Framed Swirling Night Wall Art');
+  assert.equal(rows[0].buyer, 'thehappy186');
+  assert.equal(rows[0].sale_total, 12);
+  assert.equal(rows[0].order_id, '6bc49c2e8da91b8c0d4d9aff0');
+});
+
+test('parses current unquoted Poshmark bundles with accepted offer amount', () => {
+  const rows = parseSaleEmail(
+    'orders@poshmark.com',
+    'Bundle of 8x10 Framed Quilling-Style and 4 more items just sold to @pmcm207 on Poshmark!',
+    'Great news - you just sold 5 items in a bundle.\nOrder ID 6bc49c2e8da91b8c0d4d9aff1\nOffer Price $50.00\nYour Earnings $38.00'
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].quantity, 5);
+  assert.equal(rows[0].sale_total, 50);
+  assert.equal(rows[0].unit_price, 10);
+});
+
+test('does not treat Poshmark offers as completed sales', () => {
+  assert.deepEqual(parseSaleEmail(
+    'orders@poshmark.com',
+    'New buyer offer on 8x10 Framed Art from @buyer',
+    'Offer Price $30.00'
+  ), []);
+});
+
 test('ignores unrelated Poshmark email subjects', () => {
   const rows = parseSaleEmail(
     'orders@poshmark.com',
