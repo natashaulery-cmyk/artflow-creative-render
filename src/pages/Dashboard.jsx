@@ -1035,6 +1035,13 @@ export default function Dashboard() {
       </section>
 
       <BankBalancesCard />
+      <Link to="/budget" className="flex items-center justify-between gap-3 rounded-2xl bg-card border border-[hsl(var(--border))] p-4 hover:bg-muted/40">
+        <div>
+          <p className="font-semibold text-sm">Monthly Budget</p>
+          <p className="text-xs text-muted-foreground mt-1">Plan income, expenses, savings and spending</p>
+        </div>
+        <span className="text-sm font-semibold text-[hsl(var(--primary))] shrink-0">Open Budget</span>
+      </Link>
 
       <section aria-labelledby="home-supply-averages" className="space-y-3">
         <div className="flex items-center justify-between gap-3">
