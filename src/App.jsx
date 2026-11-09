@@ -18,6 +18,7 @@ import Taxes from '@/pages/Taxes';
 import Reports from '@/pages/Reports';
 import AverageOrderCost from '@/pages/AverageOrderCost';
 import BusinessPlan from '@/pages/BusinessPlan';
+import Budget from '@/pages/Budget';
 import { Navigate } from 'react-router-dom';
 import { ThemeProvider } from "next-themes";
 import Account from '@/pages/Account';
@@ -138,6 +139,7 @@ const AuthenticatedApp = () => {
           <Route path="/reports" element={<Reports />} />
           <Route path="/average-order-cost" element={<AverageOrderCost />} />
           <Route path="/planning" element={<BusinessPlan />} />
+          <Route path="/budget" element={<Budget />} />
           <Route path="/account" element={<Account />} />
           <Route path="/send-sale" element={<MobileSaleCapture />} />
           <Route path="/calendar" element={<Calendar />} />
