@@ -42,7 +42,7 @@ async function plaid(path, payload) {
   return body;
 }
 function publicAccounts(accounts) {
-  return (accounts || []).filter((a) => ['depository', 'credit'].includes(a.type)).map((a) => ({
+  return (accounts || []).filter((a) => a.type === 'depository').map((a) => ({
     id: String(a.account_id || ''),
     name: String(a.name || 'Account').slice(0, 100),
     mask: String(a.mask || '').slice(-4),
@@ -73,8 +73,8 @@ async function refreshBalances(client, userId, { force = false } = {}) {
   const rows = (await client.query("SELECT item_id,encrypted_access_token FROM artflow.bank_balance_links WHERE user_id=$1 ORDER BY created_at ASC", [userId])).rows;
   for (const row of rows) {
     // Atomic refresh lease prevents duplicate requests from multiple open browser tabs.
-    // Refresh automatically every 15 minutes; manual refresh is limited to once per minute.
-    const lease = await client.query("UPDATE artflow.bank_balance_links SET attempted_at=now() WHERE user_id=$1 AND item_id=$2 AND (attempted_at IS NULL OR attempted_at < now() - CASE WHEN $3::boolean THEN interval '1 minute' ELSE interval '15 minutes' END) RETURNING item_id", [userId, row.item_id, force]);
+    // Refresh automatically at most once an hour; manual refresh at most once in 5 minutes to limit billed provider requests.
+    const lease = await client.query("UPDATE artflow.bank_balance_links SET attempted_at=now() WHERE user_id=$1 AND item_id=$2 AND (attempted_at IS NULL OR attempted_at < now() - CASE WHEN $3::boolean THEN interval '5 minutes' ELSE interval '1 hour' END) RETURNING item_id", [userId, row.item_id, force]);
     if (!lease.rowCount) continue;
     try {
       const response = await plaid('/accounts/balance/get', { access_token: unseal(row.encrypted_access_token) });
