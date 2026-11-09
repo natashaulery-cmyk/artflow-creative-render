@@ -8,6 +8,7 @@ import { artflowAuthClient } from "@/lib/artflowAuthClient";
 import { useAuth } from "@/lib/AuthContext";
 import BusinessManager from "@/components/BusinessManager";
 import ThemeSettings from "@/components/ThemeSettings";
+import BankBalancesCard from "@/components/BankBalancesCard";
 import GmailSyncCard from "@/components/GmailSyncCard";
 import YahooInboxCard from "@/components/YahooInboxCard";
 import EbayConnectionCard from "@/components/EbayConnectionCard";
@@ -90,6 +91,8 @@ export default function Account() {
       </section>
 
       <BusinessManager />
+
+      <BankBalancesCard />
 
       <GmailSyncCard />
 
