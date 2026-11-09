@@ -27,6 +27,7 @@ import ProfitScoreBadge from "@/components/ProfitScoreBadge";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
 import { averageOrderCost } from "@/lib/averageOrderCost";
+import BankBalancesCard from "@/components/BankBalancesCard";
 
 const numberValue = (value) => {
   const parsed = Number(value);
@@ -1032,6 +1033,8 @@ export default function Dashboard() {
           </div>
         </div>
       </section>
+
+      <BankBalancesCard />
 
       <section aria-labelledby="home-supply-averages" className="space-y-3">
         <div className="flex items-center justify-between gap-3">
