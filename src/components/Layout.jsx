@@ -18,6 +18,7 @@ import {
   Percent,
   Car,
   Target,
+  Wallet,
 } from "lucide-react";
 
 import BottomNav from "@/components/BottomNav";
@@ -43,6 +44,7 @@ const navItems = [
   { label: "Orders", to: "/orders", icon: ShoppingCart },
   { label: "Expenses", to: "/expenses", icon: Receipt },
   { label: "Inventory", to: "/inventory", icon: Package },
+  { label: "Budget", to: "/budget", icon: Wallet },
   { label: "Reports", to: "/reports", icon: BarChart3 },
   { label: "Average Order Cost", to: "/average-order-cost", icon: BarChart3 },
   { label: "Business Plan", to: "/planning", icon: Target },
