@@ -1,4 +1,4 @@
-export const PLATFORMS = ["Vinted", "Depop", "eBay", "Poshmark", "Facebook Marketplace"]; 
+export const PLATFORMS = ["Vinted", "Depop", "eBay", "Poshmark", "Facebook Marketplace", "Mercari"]; 
 
 export const PLATFORM_TONE = {
   Vinted: "pastel-lavender text-[hsl(var(--primary))]",
@@ -6,6 +6,7 @@ export const PLATFORM_TONE = {
   eBay: "pastel-blue text-slate-600",
   Poshmark: "bg-pink-100 text-pink-700",
   "Facebook Marketplace": "bg-blue-100 text-blue-700",
+  Mercari: "bg-red-100 text-red-700",
   Legacy: "bg-muted text-muted-foreground",
 };
 
@@ -15,6 +16,7 @@ export const PLATFORM_BAR = {
   eBay: "bg-blue-400",
   Poshmark: "bg-pink-400",
   "Facebook Marketplace": "bg-blue-600",
+  Mercari: "bg-red-500",
   Legacy: "bg-slate-300",
 };
 
@@ -43,6 +45,9 @@ export function orderSourceUrl(order) {
   if (platform === "Poshmark" && /^[a-f0-9]{24}$/i.test(orderId)) {
     return `https://poshmark.com/order/sales/${orderId}`;
   }
+  if (platform === "Mercari" && /^[mb]\d{8,}$/i.test(orderId)) {
+    return `https://www.mercari.com/us/item/${encodeURIComponent(orderId)}/`;
+  }
   if (platform === "eBay" && /^\d{2}-\d{5}-\d{5}$/.test(orderId)) {
     return `https://www.ebay.com/sh/ord/details?orderid=${encodeURIComponent(orderId)}`;
   }
@@ -62,6 +67,7 @@ export function orderSourceUrl(order) {
     eBay: "https://www.ebay.com/",
     Poshmark: "https://poshmark.com/",
     "Facebook Marketplace": "https://www.facebook.com/marketplace/",
+    Mercari: "https://www.mercari.com/",
   };
   return fallback[platform] || "";
 }

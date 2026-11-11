@@ -10,7 +10,7 @@ const pool = new Pool({
   max: 1,
 });
 
-const SUPPORTED = ['Vinted', 'Depop', 'eBay', 'Poshmark', 'Facebook Marketplace'];
+const SUPPORTED = ['Vinted', 'Depop', 'eBay', 'Poshmark', 'Facebook Marketplace', 'Mercari'];
 const normalize = (value = '') => String(value || '').trim().toLowerCase();
 
 function normalizeLinks(value) {

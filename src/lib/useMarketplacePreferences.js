@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 
-export const TRACKABLE_MARKETPLACES = ["Vinted", "Depop", "eBay", "Poshmark", "Facebook Marketplace"];
+export const TRACKABLE_MARKETPLACES = ["Vinted", "Depop", "eBay", "Poshmark", "Facebook Marketplace", "Mercari"];
 
 const normalizeSelection = (items = []) =>
   TRACKABLE_MARKETPLACES.filter((name) => Array.isArray(items) && items.includes(name));

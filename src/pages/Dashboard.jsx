@@ -1119,6 +1119,7 @@ export default function Dashboard() {
                     Vinted: "#027783",
                     Depop: "#E4001D",
                     eBay: "#0064D2",
+                     Mercari: "#E94560",
                   };
                   const color = brandColors[row.name] || "#8B5CF6";
 

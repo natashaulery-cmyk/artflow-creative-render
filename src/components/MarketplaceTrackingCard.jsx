@@ -9,6 +9,7 @@ const SITE_HELP = {
   eBay: "Sync eBay orders and sales",
   Poshmark: "Sync Poshmark orders and sales",
   "Facebook Marketplace": "Track Facebook Marketplace / Seller app sales. Add completed sales in Orders.",
+  Mercari: "Track Mercari sales in Orders. Add orders or import your Mercari Gross Sales Report CSV.",
 };
 
 export default function MarketplaceTrackingCard() {
@@ -31,7 +32,7 @@ export default function MarketplaceTrackingCard() {
     setSavingSite(name);
     try {
       await save(next);
-      const action = name === "Facebook Marketplace" ? "tracking" : "sync";
+      const action = ["Facebook Marketplace", "Mercari"].includes(name) ? "tracking" : "sync";
       toast.success(wasActive ? `${name} ${action} turned off` : `${name} selected for ${action}`);
     } catch (error) {
       setDraft(draft);
@@ -85,7 +86,7 @@ export default function MarketplaceTrackingCard() {
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{SITE_HELP[name]}</p>
                 <p className={`text-[11px] font-semibold mt-2 ${active ? "text-[hsl(var(--primary))]" : "text-muted-foreground"}`}>
-                  {saving ? "Saving…" : name === "Facebook Marketplace" ? (active ? "Tracking on" : "Tap to track") : active ? "Sync on" : "Tap to sync"}
+                  {saving ? "Saving…" : ["Facebook Marketplace", "Mercari"].includes(name) ? (active ? "Tracking on" : "Tap to track") : active ? "Sync on" : "Tap to sync"}
                 </p>
               </button>
             );
