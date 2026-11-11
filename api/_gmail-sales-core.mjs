@@ -1,6 +1,6 @@
 import pg from 'pg';
 import { pooledDatabaseUrl } from './_db.mjs';
-import { isMercariSender, parseMercariSaleEmail } from './_mercari-email.mjs';
+import { isMercariSender, parseMercariSaleEmail, mercariProductImageUrl } from './_mercari-email.mjs';
 
 const { Pool } = pg;
 export const pool = new Pool({
@@ -537,8 +537,9 @@ function marketplaceSourceUrl(platform = '', html = '') {
   return candidates[0]?.url || '';
 }
 
-export function marketplaceImageUrl(platform = '', html = '', title = '') {
+export function marketplaceImageUrl(platform = '', html = '', title = '', orderId = '') {
   if (!html) return '';
+  if (platform === 'Mercari') return mercariProductImageUrl(html, orderId);
 
   const key = (value = '') => clean(value).toLowerCase().replace(/[^a-z0-9]+/g, '');
   const titleKey = key(title);
@@ -745,7 +746,7 @@ async function insertRows(client, businessId, messageId, receivedAt, rows) {
           bundle_item_titles: Array.isArray(row.bundle_item_titles) ? row.bundle_item_titles : [],
         } : {}),
         ...(row.platform === 'Poshmark' ? { poshmark_parser_version: 4 } : {}),
-        ...(row.platform === 'Mercari' ? { mercari_selling_fee: sellingFee, mercari_earnings: row.earnings } : {}),
+        ...(row.platform === 'Mercari' ? { mercari_selling_fee: sellingFee, mercari_earnings: row.earnings, mercari_image_parser_version: 1 } : {}),
         ...(row.platform === 'Facebook Marketplace' ? { facebook_image_parser_version: 3 } : {}),
       }),
       row.product_name,
@@ -939,6 +940,10 @@ export async function syncGmailAccount(client, business, accessToken, { force = 
            platform='Facebook Marketplace'
            AND COALESCE(data->>'facebook_image_parser_version','') <> '3'
          )
+         OR (
+           platform='Mercari'
+           AND COALESCE(data->>'mercari_image_parser_version','') <> '1'
+         )
        )
      ORDER BY 1
   `, [business.base44_id]);
@@ -972,6 +977,10 @@ export async function syncGmailAccount(client, business, accessToken, { force = 
           AND (
             platform <> 'Facebook Marketplace'
             OR COALESCE(data->>'facebook_image_parser_version','') = '3'
+          )
+          AND (
+            platform <> 'Mercari'
+            OR COALESCE(data->>'mercari_image_parser_version','') = '1'
           )
         )
         UNION
@@ -1053,7 +1062,7 @@ export async function syncGmailAccount(client, business, accessToken, { force = 
         }
 
         if (!row.depop_bundle) {
-          const imageUrl = marketplaceImageUrl(row.platform, html, row.product_name);
+          const imageUrl = marketplaceImageUrl(row.platform, html, row.product_name, row.order_id);
           if (imageUrl) row.image_url = imageUrl;
         }
       }

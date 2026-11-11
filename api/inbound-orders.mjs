@@ -2,7 +2,7 @@ import pg from 'pg';
 import { pooledDatabaseUrl } from './_db.mjs';
 import getRawBody from 'raw-body';
 import { Resend } from 'resend';
-import { isMercariSender, parseMercariSaleEmail } from './_mercari-email.mjs';
+import { isMercariSender, parseMercariSaleEmail, mercariProductImageUrl } from './_mercari-email.mjs';
 
 const { Pool } = pg;
 const pool = new Pool({
@@ -388,7 +388,7 @@ export async function insertRows(client, businessId, emailId, receivedAt, rows) 
       JSON.stringify({
         source: 'resend_inbound_email',
         resend_email_id: emailId,
-        ...(row.platform === 'Mercari' ? { mercari_selling_fee: sellingFee, mercari_earnings: row.earnings, ...(row.source_url ? { source_url: row.source_url } : {}) } : {}),
+        ...(row.platform === 'Mercari' ? { mercari_selling_fee: sellingFee, mercari_earnings: row.earnings, ...(row.source_url ? { source_url: row.source_url } : {}), ...(row.image_url ? { image_url: row.image_url } : {}) } : {}),
         ...(row.depop_bundle ? {
           depop_bundle: true,
           bundle_item_count: row.bundle_item_count || row.quantity || 1,
@@ -477,6 +477,12 @@ export default async function handler(req, res) {
 
     const parsedRows = parseSaleEmail(marketplaceSender, subject, text);
     if (!parsedRows.length) return res.status(200).send('OK');
+    for (const row of parsedRows) {
+      if (row.platform === 'Mercari') {
+        const artwork = mercariProductImageUrl(email?.html || '', row.order_id);
+        if (artwork) row.image_url = artwork;
+      }
+    }
 
     const inserted = await insertRows(client, config.business_id, event.data.email_id, email?.created_at || event?.created_at || new Date().toISOString(), parsedRows);
     console.log('Inbound order email processed', { platform: parsedRows[0]?.platform, parsed: parsedRows.length, inserted: inserted.length });

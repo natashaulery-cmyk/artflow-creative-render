@@ -11,7 +11,7 @@ import { useModalRoute } from "@/hooks/useModalRoute";
 import { useLocation, useNavigate } from "react-router-dom";
 import PullToRefresh from "@/components/PullToRefresh";
 import SyncStatus from "@/components/SyncStatus";
-import { PLATFORM_TONE, displayPlatform, displayProductName, orderSourceUrl } from "@/lib/platforms";
+import { PLATFORM_TONE, displayPlatform, displayProductName, orderSourceUrl, mercariArtworkUrl } from "@/lib/platforms";
 import { useMarketplacePreferences } from "@/lib/useMarketplacePreferences";
 import { toast } from "sonner";
 
@@ -232,6 +232,8 @@ export default function Orders() {
     const direct = String(directImageUrl(order) || "").trim();
     const platform = displayPlatform(order?.platform);
     const listing = String(order?.source_url || "").trim();
+
+    if (platform === "Mercari") return mercariArtworkUrl(order, direct);
 
     if (platform === "Facebook Marketplace") {
       const isFacebookImage = /^https:\/\/(?:[^/]+\.)?(?:fbcdn\.net|facebook\.com)\//i.test(direct);

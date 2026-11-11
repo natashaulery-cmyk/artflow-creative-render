@@ -42,3 +42,28 @@ export function parseMercariSaleEmail(subject = '', text = '') {
     source_url: 'https://www.mercari.com/us/item/' + encodeURIComponent(itemId) + '/',
   }];
 }
+
+
+// Match the sold item's photo; never use Mercari branding, tracking pixels,
+// carrier icons, or another user's thumbnail from the notification.
+export function mercariProductImageUrl(html = '', itemId = '') {
+  const expected = clean(itemId).toLowerCase();
+  if (!/^m\d{8,}$/.test(expected)) return '';
+  const markup = String(html || '')
+    .replace(/=\r?\n/g, '')
+    .replace(/=3D/gi, '=')
+    .replace(/&amp;/gi, '&');
+  const candidates = [];
+  for (const match of markup.matchAll(/<img\b[^>]*>/gi)) {
+    const src = match[0].match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1] || '';
+    try {
+      const url = new URL(src);
+      if (url.protocol !== 'https:' || url.hostname.toLowerCase() !== 'u-mercari-images.mercdn.net') continue;
+      const photo = url.pathname.match(/^\/thumb\/photos\/(m\d{8,})_(\d+)\.(?:jpe?g|png|webp)$/i);
+      if (photo?.[1]?.toLowerCase() !== expected) continue;
+      candidates.push({ url: url.toString(), index: Number(photo[2]) });
+    } catch { /* malformed source */ }
+  }
+  candidates.sort((a, b) => a.index - b.index);
+  return candidates[0]?.url || '';
+}

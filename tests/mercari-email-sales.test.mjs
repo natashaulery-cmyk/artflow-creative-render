@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isMercariSender, parseMercariSaleEmail } from '../api/_mercari-email.mjs';
-import { GMAIL_QUERIES, parseSaleEmail } from '../api/_gmail-sales-core.mjs';
+import { isMercariSender, parseMercariSaleEmail, mercariProductImageUrl } from '../api/_mercari-email.mjs';
+import { GMAIL_QUERIES, parseSaleEmail, marketplaceImageUrl } from '../api/_gmail-sales-core.mjs';
 
 const notice = [
   'Congratulations!',
@@ -63,4 +63,26 @@ test('supports a compact price/fee format', () => {
   assert.equal(rows.length, 1);
   assert.equal(rows[0].sale_total, 15);
   assert.equal(rows[0].selling_fee, 2.1);
+});
+
+
+test('chooses correct sold artwork photo over logos, maps, and another item', () => {
+  const html = [
+    '<img width="109" src="https://u-mercari-images.mercdn.net/assets/img/mail_responsive/common/logo-blue.png">',
+    '<img width="295" src="https://u-mercari-images.mercdn.net/assets/img/mail_responsive/transactional/logo_usps.png">',
+    '<img src="https://u-mercari-images.mercdn.net/thumb/photos/m99999999999_1.jpg?other">',
+    '<img src="https://u-mercari-images.mercdn.net/thumb/photos/m12345678901_2.jpg?older">',
+    '<img src="https://u-mercari-images.mercdn.net/thumb/photos/m12345678901_1.jpg?123456">',
+    '<img width="1" height="1" src="https://ablink.links.us.mercari.com/wf/open?abc">',
+  ].join('\n');
+  const expected = 'https://u-mercari-images.mercdn.net/thumb/photos/m12345678901_1.jpg?123456';
+  assert.equal(mercariProductImageUrl(html, 'm12345678901'), expected);
+  assert.equal(marketplaceImageUrl('Mercari', html, '5x7 Art', 'm12345678901'), expected);
+  assert.equal(mercariProductImageUrl(html, 'm55555555555'), '');
+});
+
+test('handles quoted-printable Mercari artwork image attributes', () => {
+  const html = '<img src=3D"https://u-mercari-images.mercdn.net/thumb/photos/m12345678901_1.jpg?ver=3D123=\r\n456">';
+  assert.equal(mercariProductImageUrl(html, 'm12345678901'),
+    'https://u-mercari-images.mercdn.net/thumb/photos/m12345678901_1.jpg?ver=123456');
 });

@@ -33,6 +33,21 @@ export function displayPlatform(value) {
   return canonical || "Legacy";
 }
 
+// Recovery for sale emails imported before the Mercari product-photo parser.
+export function mercariArtworkUrl(order, imageUrl = '') {
+  const direct = String(imageUrl || order?.image_url || order?.data?.image_url || '').trim();
+  if (displayPlatform(order?.platform) !== 'Mercari') return direct;
+  const itemId = String(order?.order_id || '').trim();
+  if (/^https:\/\/u-mercari-images\.mercdn\.net\//i.test(direct)) {
+    const photoId = direct.match(/\/thumb\/photos\/(m\d{8,})_\d+\.(?:jpe?g|png|webp)/i)?.[1];
+    if (photoId && photoId.toLowerCase() === itemId.toLowerCase()) return direct;
+  } else if (direct && !/^https:\/\/(?:(?:[^/]+\.)?braze-images\.com|(?:[^/]+\.)?appboy-images\.com|ablink\.links\.us\.mercari\.com)\//i.test(direct)) {
+    return direct;
+  }
+  if (!/^m\d{8,}$/i.test(itemId)) return '';
+  return `https://u-mercari-images.mercdn.net/thumb/photos/${itemId}_1.jpg`;
+}
+
 export function displayProductName(order) {
   const name = String(order?.product_name || "").trim();
   return name || `${displayPlatform(order?.platform)} sale`;

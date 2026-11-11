@@ -22,7 +22,7 @@ import {
   currentMonthKey,
   monthLabel,
 } from "@/lib/format";
-import { displayPlatform, PLATFORMS } from "@/lib/platforms";
+import { displayPlatform, PLATFORMS, mercariArtworkUrl } from "@/lib/platforms";
 import ProfitScoreBadge from "@/components/ProfitScoreBadge";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
@@ -491,7 +491,7 @@ export default function Dashboard() {
     if (bundleOrder) return "/bundle-placeholder.svg";
 
     const direct = directImageUrl(order);
-    return direct || "";
+    return displayPlatform(order?.platform) === "Mercari" ? mercariArtworkUrl(order, direct) : (direct || "");
   }, []);
 
   const imageForOrder = React.useCallback(
@@ -502,6 +502,7 @@ export default function Dashboard() {
       if (bundleOrder) return "/bundle-placeholder.svg";
 
       const direct = directImageUrl(order);
+      if (displayPlatform(order?.platform) === "Mercari") return mercariArtworkUrl(order, direct);
       if (direct) return direct;
 
       const source = String(order?.source_url || order?.data?.source_url || "").trim();
