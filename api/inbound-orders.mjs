@@ -2,6 +2,7 @@ import pg from 'pg';
 import { pooledDatabaseUrl } from './_db.mjs';
 import getRawBody from 'raw-body';
 import { Resend } from 'resend';
+import { isMercariSender, parseMercariSaleEmail } from './_mercari-email.mjs';
 
 const { Pool } = pg;
 const pool = new Pool({
@@ -43,6 +44,7 @@ function isAllowedMarketplaceSender(value = '') {
     '@ohhey.depop.com',
     '@ebay.com',
     '@marketplace.facebook.com',
+    '@alerts.us.mercari.com',
   ].some((suffix) => email.endsWith(suffix));
 }
 
@@ -336,6 +338,7 @@ export function parseSaleEmail(from, subject, text) {
   if (email.endsWith('@alerts.depop.com') || email.endsWith('@ohhey.depop.com')) return depopRows(subject, text);
   if (email.endsWith('@ebay.com')) return ebayRows(subject, text);
   if (email.endsWith('@marketplace.facebook.com')) return facebookMarketplaceRows(subject, text);
+  if (isMercariSender(email)) return parseMercariSaleEmail(subject, text);
   return [];
 }
 
@@ -357,7 +360,9 @@ export async function insertRows(client, businessId, emailId, receivedAt, rows) 
     const row = rows[index];
     const sourceEmailId = rows.length > 1 ? `${emailId}:${index + 1}` : emailId;
     const costs = costsFor(row.product_name, row.quantity);
-    const profit = Number((Number(row.sale_total || 0) - Number(costs.total_cost || 0)).toFixed(2));
+    const sellingFee = row.platform === 'Mercari' ? Math.max(0, Number(row.selling_fee) || 0) : 0;
+    const totalCost = Number((Number(costs.total_cost || 0) + sellingFee).toFixed(2));
+    const profit = Number((Number(row.sale_total || 0) - totalCost).toFixed(2));
     const result = await client.query(`
       INSERT INTO artflow.orders (
         base44_id,business_id,sale_date,platform,archived,order_id,source_email_id,created_by_id,created_date,updated_date,data,
@@ -383,6 +388,7 @@ export async function insertRows(client, businessId, emailId, receivedAt, rows) 
       JSON.stringify({
         source: 'resend_inbound_email',
         resend_email_id: emailId,
+        ...(row.platform === 'Mercari' ? { mercari_selling_fee: sellingFee, mercari_earnings: row.earnings, ...(row.source_url ? { source_url: row.source_url } : {}) } : {}),
         ...(row.depop_bundle ? {
           depop_bundle: true,
           bundle_item_count: row.bundle_item_count || row.quantity || 1,
@@ -398,7 +404,7 @@ export async function insertRows(client, businessId, emailId, receivedAt, rows) 
       costs.base_item_cost,
       costs.paper_ink_cost,
       costs.packaging_cost,
-      costs.total_cost,
+      totalCost,
       profit,
     ]);
     if (result.rows[0]) inserted.push(result.rows[0]);

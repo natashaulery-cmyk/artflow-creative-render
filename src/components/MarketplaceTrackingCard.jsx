@@ -9,7 +9,7 @@ const SITE_HELP = {
   eBay: "Sync eBay orders and sales",
   Poshmark: "Sync Poshmark orders and sales",
   "Facebook Marketplace": "Track Facebook Marketplace / Seller app sales. Add completed sales in Orders.",
-  Mercari: "Track Mercari sales in Orders. Add orders or import your Mercari Gross Sales Report CSV.",
+  Mercari: "Track Mercari sales automatically from a connected Gmail inbox, or add a sale manually.",
 };
 
 export default function MarketplaceTrackingCard() {

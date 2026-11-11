@@ -1,5 +1,6 @@
 import pg from 'pg';
 import { pooledDatabaseUrl } from './_db.mjs';
+import { isMercariSender, parseMercariSaleEmail } from './_mercari-email.mjs';
 
 const { Pool } = pg;
 export const pool = new Pool({
@@ -26,6 +27,7 @@ export function isAllowedMarketplaceSender(value = '') {
     '@ohhey.depop.com',
     '@ebay.com',
     '@marketplace.facebook.com',
+    '@alerts.us.mercari.com',
   ].some((suffix) => email.endsWith(suffix));
 }
 
@@ -427,6 +429,7 @@ export function parseSaleEmail(from, subject, text, trustedForwarder = false) {
   if (email.endsWith('@alerts.depop.com') || email.endsWith('@ohhey.depop.com')) return depopRows(subject, text);
   if (email.endsWith('@ebay.com')) return ebayRows(subject, text);
   if (email.endsWith('@marketplace.facebook.com')) return facebookMarketplaceRows(subject, text);
+  if (isMercariSender(email)) return parseMercariSaleEmail(subject, text);
   if (trustedForwarder && /\bebay\b/i.test(`${subject}\n${text}`)) return ebayRows(subject, text);
   if (trustedForwarder && /(?:new marketplace order for|congrats on your marketplace order)/i.test(`${subject}\n${text}`)) {
     return facebookMarketplaceRows(subject, text);
@@ -673,6 +676,7 @@ export const GMAIL_QUERIES = [
   `from:poshmark.com subject:"Please do not ship:" "was canceled" after:${GMAIL_YEAR_START}`,
   `{from:alerts.depop.com from:ohhey.depop.com} subject:"Sale confirmation for" after:${GMAIL_YEAR_START}`,
   `from:noreply@marketplace.facebook.com {subject:"New Marketplace order for" subject:"Shipping label for your Marketplace order"} after:${GMAIL_YEAR_START}`,
+  `from:no-reply@alerts.us.mercari.com subject:"made a sale" after:${GMAIL_YEAR_START}`,
 ];
 
 async function listMessageIds(accessToken) {
@@ -718,7 +722,9 @@ async function insertRows(client, businessId, messageId, receivedAt, rows) {
     const row = rows[index];
     const sourceEmailId = rows.length > 1 ? `${messageId}:${index + 1}` : messageId;
     const costs = costsFor(row.product_name, row.quantity);
-    const profit = Number((Number(row.sale_total || 0) - Number(costs.total_cost || 0)).toFixed(2));
+    const sellingFee = row.platform === 'Mercari' ? Math.max(0, Number(row.selling_fee) || 0) : 0;
+    const totalCost = Number((Number(costs.total_cost || 0) + sellingFee).toFixed(2));
+    const profit = Number((Number(row.sale_total || 0) - totalCost).toFixed(2));
     const values = [
       businessId,
       localDate(receivedAt),
@@ -739,6 +745,7 @@ async function insertRows(client, businessId, messageId, receivedAt, rows) {
           bundle_item_titles: Array.isArray(row.bundle_item_titles) ? row.bundle_item_titles : [],
         } : {}),
         ...(row.platform === 'Poshmark' ? { poshmark_parser_version: 4 } : {}),
+        ...(row.platform === 'Mercari' ? { mercari_selling_fee: sellingFee, mercari_earnings: row.earnings } : {}),
         ...(row.platform === 'Facebook Marketplace' ? { facebook_image_parser_version: 3 } : {}),
       }),
       row.product_name,
@@ -750,7 +757,7 @@ async function insertRows(client, businessId, messageId, receivedAt, rows) {
       costs.base_item_cost,
       costs.paper_ink_cost,
       costs.packaging_cost,
-      costs.total_cost,
+      totalCost,
       profit,
     ];
 
