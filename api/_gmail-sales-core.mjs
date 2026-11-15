@@ -817,6 +817,23 @@ async function insertRows(client, businessId, messageId, receivedAt, rows) {
              source_email_id=$5 OR
              ($4::text IS NOT NULL AND $4::text<>'' AND order_id=$4::text AND platform=$3) OR
              (platform=$3 AND lower(product_name)=lower($8) AND sale_date=$2 AND COALESCE(sale_total,0)=0)
+             OR (
+               -- Forwarded Depop emails were saved as orders without an image.
+               -- Match the same buyer, title, date and price before upgrading
+               -- the old order from Gmail, avoiding a second sale entry.
+               lower(platform)='depop'
+               AND lower($3::text)='depop'
+               AND sync_source='resend_inbound_email'
+               AND lower(trim(COALESCE(product_name,'')))=lower(trim($8::text))
+               AND sale_date=$2
+               AND abs(COALESCE(sale_total,0)-$12)<0.01
+               AND lower(trim(COALESCE(buyer,'')))=lower(trim(COALESCE($13::text,'')))
+               AND COALESCE(NULLIF($7::jsonb->>'image_url',''),'')<>''
+               AND (
+                 COALESCE(data->>'image_url','')=''
+                 OR COALESCE(data->>'image_url','') ~* '(shipping-labels\\.depop\\.com|qr-codes/|braze-images\\.com)'
+               )
+             )
            )
          RETURNING base44_id,product_name,platform,sale_total
       ), inserted AS (
