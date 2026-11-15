@@ -567,6 +567,14 @@ export function marketplaceImageUrl(platform = '', html = '', title = '', orderI
 
     if (
       /email[_-]?track|tracking|spacer|pixel|transparent|vinted_logo|logo\.(?:png|jpg|jpeg|gif|webp)/i.test(lower)
+      // A Depop sale confirmation starts with a shipping QR code, followed
+      // by the actual sold-artwork thumbnail. Never save the QR as artwork.
+      || (platform === 'Depop' && (
+        /shipping-labels\.depop\.com\/qr-codes\//i.test(lower)
+        || /buyer profile picture/i.test(alt)
+        || /braze-images\.com\/appboy\//i.test(lower)
+        || (/media-photos\.depop\.com/i.test(lower) && width > 0 && width < 64)
+      ))
       || (platform === 'Facebook Marketplace' && /facebook_icon\.png|\/images\/email\/facebook_/i.test(lower))
       || (width > 0 && width <= 2)
       || (height > 0 && height <= 2)
@@ -581,7 +589,13 @@ export function marketplaceImageUrl(platform = '', html = '', title = '', orderI
 
     if (platform === 'Vinted' && /(?:^|\.)vinted\.net|(?:^|\.)vinted\.com/i.test(new URL(src).hostname)) score += 12;
     if (platform === 'Poshmark' && /poshmark|cloudfront|cloudinary/i.test(lower)) score += 10;
-    if (platform === 'Depop' && /depop|cloudfront|cloudinary/i.test(lower)) score += 10;
+    if (platform === 'Depop') {
+      if (/depop|cloudfront|cloudinary/i.test(lower)) score += 10;
+      // Real Depop product photos use media-photos.depop.com (currently
+      // 120x120 in sale emails); shipping labels and buyer avatars must lose.
+      if (/^https:\/\/(?:media-photos|media)\.depop\.com\//i.test(src)) score += 80;
+      if (width >= 80 && height >= 80) score += 10;
+    }
     if (platform === 'Facebook Marketplace') {
       // Facebook seller emails contain both the 32x32 Facebook brand icon and
       // the actual sold-item thumbnail. Never let the brand asset win.
@@ -744,7 +758,7 @@ async function insertRows(client, businessId, messageId, receivedAt, rows) {
         source: 'gmail_direct_sales',
         gmail_message_id: messageId,
         source_link_parser_version: 1,
-        source_image_parser_version: row.platform === 'Depop' ? 2 : 1,
+        source_image_parser_version: row.platform === 'Depop' ? 3 : 1,
         ...(row.source_url ? { source_url: row.source_url } : {}),
         ...(row.image_url ? { image_url: row.image_url } : {}),
         ...(row.depop_bundle ? {
@@ -943,7 +957,7 @@ export async function syncGmailAccount(client, business, accessToken, { force = 
            platform='Depop'
            AND (
              source_email_id LIKE '%:%'
-             OR COALESCE(data->>'source_image_parser_version','') <> '2'
+             OR COALESCE(data->>'source_image_parser_version','') <> '3'
            )
          )
          OR (
@@ -983,7 +997,7 @@ export async function syncGmailAccount(client, business, accessToken, { force = 
             OR COALESCE(data->>'poshmark_parser_version','') = '4'
           )
           AND COALESCE(data->>'source_link_parser_version','') = '1'
-          AND COALESCE(data->>'source_image_parser_version','') = CASE WHEN platform='Depop' THEN '2' ELSE '1' END
+          AND COALESCE(data->>'source_image_parser_version','') = CASE WHEN platform='Depop' THEN '3' ELSE '1' END
           AND (
             platform <> 'Facebook Marketplace'
             OR COALESCE(data->>'facebook_image_parser_version','') = '3'
@@ -1071,7 +1085,7 @@ export async function syncGmailAccount(client, business, accessToken, { force = 
           if (sourceUrl) row.source_url = sourceUrl;
         }
 
-        if (!row.depop_bundle) {
+        if (!row.depop_bundle || row.platform === 'Depop') {
           const imageUrl = marketplaceImageUrl(row.platform, html, row.product_name, row.order_id);
           if (imageUrl) row.image_url = imageUrl;
         }
