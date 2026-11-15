@@ -519,6 +519,20 @@ async function listOrders(client, session) {
      LIMIT 10000`,
     [ids, email, listingScopes]
   );
+  const depopRows = result.rows.filter((row) => String(row.platform || "").toLowerCase() === "depop");
+  if (depopRows.length) {
+    // Counts only. Never log a customer's title, order ID, or photo URL.
+    console.info("Depop displayed image coverage", {
+      orders: depopRows.length,
+      withPhoto: depopRows.filter((row) => /^https:\/\//i.test(String(row.image_url || ""))).length,
+      missingPhoto: depopRows.filter((row) => !row.image_url).length,
+      sources: depopRows.reduce((acc, row) => {
+        const source = String(row.sync_source || "unknown");
+        acc[source] = (acc[source] || 0) + 1;
+        return acc;
+      }, {}),
+    });
+  }
   return result.rows;
 }
 
