@@ -550,6 +550,13 @@ export function marketplaceImageUrl(platform = '', html = '', title = '', orderI
     const srcRaw = tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1] || '';
     const alt = decodeHtmlUrl(tag.match(/\balt\s*=\s*["']([^"']*)["']/i)?.[1] || '');
     let src = decodeHtmlUrl(srcRaw);
+    if (platform === 'Depop' && !/^https?:\/\//i.test(src)) {
+      // Some Depop sale emails lazy-load the artwork instead of using src.
+      const dataSrc = tag.match(/\bdata-src\s*=\s*["']([^"']+)["']/i)?.[1] || '';
+      const srcset = tag.match(/\b(?:data-)?srcset\s*=\s*["']([^"']+)["']/i)?.[1] || '';
+      const srcsetFirst = srcset.split(',')[0]?.trim().split(/\s+/)[0] || '';
+      src = decodeHtmlUrl(dataSrc || srcsetFirst || src);
+    }
     if (!src) continue;
     if (src.startsWith('//')) src = `https:${src}`;
     if (!/^https:\/\//i.test(src)) continue;
@@ -737,7 +744,7 @@ async function insertRows(client, businessId, messageId, receivedAt, rows) {
         source: 'gmail_direct_sales',
         gmail_message_id: messageId,
         source_link_parser_version: 1,
-        source_image_parser_version: 1,
+        source_image_parser_version: row.platform === 'Depop' ? 2 : 1,
         ...(row.source_url ? { source_url: row.source_url } : {}),
         ...(row.image_url ? { image_url: row.image_url } : {}),
         ...(row.depop_bundle ? {
@@ -934,7 +941,10 @@ export async function syncGmailAccount(client, business, accessToken, { force = 
          )
          OR (
            platform='Depop'
-           AND source_email_id LIKE '%:%'
+           AND (
+             source_email_id LIKE '%:%'
+             OR COALESCE(data->>'source_image_parser_version','') <> '2'
+           )
          )
          OR (
            platform='Facebook Marketplace'
@@ -973,7 +983,7 @@ export async function syncGmailAccount(client, business, accessToken, { force = 
             OR COALESCE(data->>'poshmark_parser_version','') = '4'
           )
           AND COALESCE(data->>'source_link_parser_version','') = '1'
-          AND COALESCE(data->>'source_image_parser_version','') = '1'
+          AND COALESCE(data->>'source_image_parser_version','') = CASE WHEN platform='Depop' THEN '2' ELSE '1' END
           AND (
             platform <> 'Facebook Marketplace'
             OR COALESCE(data->>'facebook_image_parser_version','') = '3'
