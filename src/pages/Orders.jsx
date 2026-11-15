@@ -33,23 +33,23 @@ const directImageUrl = (item = {}) =>
   item?.data?.photo_url ||
   "";
 
-function OrderThumbnail({ src, alt, fallbackSrc = "" }) {
+function OrderThumbnail({ src, alt, fallbackSrc = "", secondaryFallbackSrc = "" }) {
   const [failed, setFailed] = useState(false);
-  const [currentSrc, setCurrentSrc] = useState(src);
+  const [currentSrc, setCurrentSrc] = useState(src || fallbackSrc || secondaryFallbackSrc);
+  const [attempted, setAttempted] = useState([]);
 
   useEffect(() => {
     setFailed(false);
-    setCurrentSrc(src);
-  }, [src, fallbackSrc]);
+    setAttempted([]);
+    setCurrentSrc(src || fallbackSrc || secondaryFallbackSrc);
+  }, [src, fallbackSrc, secondaryFallbackSrc]);
 
   const tryFallback = () => {
-    // The Render-side image proxy sometimes cannot reach Depop's CDN.
-    // The original photo can still load directly in the user's browser.
-    if (fallbackSrc && fallbackSrc !== currentSrc) {
-      setCurrentSrc(fallbackSrc);
-    } else {
-      setFailed(true);
-    }
+    const used = [...attempted, currentSrc];
+    const next = [fallbackSrc, secondaryFallbackSrc].find((candidate) => candidate && !used.includes(candidate));
+    setAttempted(used);
+    if (next) setCurrentSrc(next);
+    else setFailed(true);
   };
 
   return (
@@ -77,6 +77,46 @@ export default function Orders() {
   // historical sales that are already part of the business ledger.
   const activeOrders = orders.filter((order) => displayPlatform(order.platform) !== "Legacy");
   const { records: inventoryCosts } = useEntity("InventoryCost", "size");
+  const [marketplaceListings, setMarketplaceListings] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    const updateListingPhotos = async () => {
+      try {
+        const response = await fetch("/api/neon-data?op=listings", { credentials: "include", cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (active) setMarketplaceListings(Array.isArray(data.listings) ? data.listings : []);
+      } catch {
+        // Orders continue to render even when listing photos cannot be fetched.
+      }
+    };
+    updateListingPhotos();
+    window.addEventListener("artflow:data-synced", updateListingPhotos);
+    return () => {
+      active = false;
+      window.removeEventListener("artflow:data-synced", updateListingPhotos);
+    };
+  }, []);
+
+  const depopPhotoSources = useMemo(() => {
+    const keyed = new Map();
+    const linked = new Map();
+    const matchKey = (value) => String(value || "").toLowerCase()
+      .replace(/^\s*[0-9]+(?:\.[0-9]+)?\s*x\s*[0-9]+(?:\.[0-9]+)?\s*[-–—|:]?\s*/i, "")
+      .replace(/\b(of|the|a|an)\b/gi, "")
+      .replace(/[^a-z0-9]+/g, "");
+    for (const item of [...marketplaceListings, ...(inventoryCosts || [])]) {
+      const image = String(directImageUrl(item) || "").trim();
+      if (!image || !/^https:\/\//i.test(image)) continue;
+      const name = item.title || item.name || item.product_name;
+      const key = matchKey(name);
+      if (key && !keyed.has(key)) keyed.set(key, image);
+      const url = String(item.listing_url || item.source_url || "").trim();
+      if (url) linked.set(url, image);
+    }
+    return { keyed, linked, matchKey };
+  }, [marketplaceListings, inventoryCosts]);
   const refresh = async () => {
     await reloadOrders();
   };
@@ -311,7 +351,11 @@ export default function Orders() {
       if (!direct && isProductListing) {
         return `/api/listing-image?listing=${encodeURIComponent(listing)}`;
       }
-      return direct || (bundleOrder ? "/bundle-placeholder.svg" : "");
+      if (direct) return direct;
+      const matchKey = depopPhotoSources.matchKey(order.product_name);
+      const matchByUrl = depopPhotoSources.linked.get(listing);
+      const matchByName = depopPhotoSources.keyed.get(matchKey);
+      return matchByUrl || matchByName || (bundleOrder ? "/bundle-placeholder.svg" : "");
     }
 
     if (platform === "eBay") {
@@ -337,7 +381,7 @@ export default function Orders() {
     }
 
     return direct || "";
-  }, []);
+  }, [depopPhotoSources]);
 
   const filtered = useMemo(() => {
     return activeOrders
@@ -514,7 +558,13 @@ export default function Orders() {
                 src={o.display_image_url}
                 alt={displayProductName(o)}
                 fallbackSrc={
-                  displayPlatform(o.platform) === "Depop" && directImageUrl(o)
+                  displayPlatform(o.platform) === "Depop"
+                    ? (depopPhotoSources.linked.get(String(o.source_url || "")) ||
+                        depopPhotoSources.keyed.get(depopPhotoSources.matchKey(o.product_name)) || "")
+                    : ""
+                }
+                secondaryFallbackSrc={
+                  displayPlatform(o.platform) === "Depop" && /^https:\/\//i.test(String(directImageUrl(o) || ""))
                     ? `/api/listing-image?image=${encodeURIComponent(directImageUrl(o))}`
                     : ""
                 }
