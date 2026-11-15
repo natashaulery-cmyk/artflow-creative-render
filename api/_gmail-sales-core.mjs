@@ -546,12 +546,12 @@ export function marketplaceImageUrl(platform = '', html = '', title = '') {
     const srcRaw = tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1] || '';
     const alt = decodeHtmlUrl(tag.match(/\balt\s*=\s*["']([^"']*)["']/i)?.[1] || '');
     let src = decodeHtmlUrl(srcRaw);
-    if (platform === 'Depop' && !/^https?:\\/\\//i.test(src)) {
+    if (platform === 'Depop' && !/^https?:\/\//i.test(src)) {
       // Some Depop sale templates put the artwork in a lazy-load attribute
       // while src is an inline placeholder or a content-id.
-      const dataSrc = tag.match(/\\bdata-src\\s*=\\s*["']([^"']+)["']/i)?.[1] || '';
-      const srcset = tag.match(/\\b(?:data-)?srcset\\s*=\\s*["']([^"']+)["']/i)?.[1] || '';
-      const srcsetFirst = srcset.split(',')[0]?.trim().split(/\\s+/)[0] || '';
+      const dataSrc = tag.match(/\bdata-src\s*=\s*["']([^"']+)["']/i)?.[1] || '';
+      const srcset = tag.match(/\b(?:data-)?srcset\s*=\s*["']([^"']+)["']/i)?.[1] || '';
+      const srcsetFirst = srcset.split(',')[0]?.trim().split(/\s+/)[0] || '';
       src = decodeHtmlUrl(dataSrc || srcsetFirst || src);
     }
     if (!src) continue;
