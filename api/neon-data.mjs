@@ -335,7 +335,12 @@ async function listOrders(client, session) {
        source_email_id,
        data->>'source_url' AS source_url,
        COALESCE(
-         NULLIF(data->>'image_url',''),
+         NULLIF(
+           CASE WHEN lower(COALESCE(platform,''))='depop'
+             AND COALESCE(data->>'image_url','') ~* '(shipping-labels[.]depop[.]com|qr-codes/|braze-images[.]com)'
+           THEN '' ELSE data->>'image_url' END,
+           ''
+         ),
          NULLIF(data->>'product_image_url',''),
          NULLIF(data->>'marketplace_image_url',''),
          NULLIF(data->>'thumbnail_url',''),
