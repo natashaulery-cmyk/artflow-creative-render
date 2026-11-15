@@ -457,3 +457,19 @@ test('recovers Depop artwork from srcset when email src is unavailable', () => {
     'https://media.depop.com/images/rose-small.jpg'
   );
 });
+
+test('Depop sale confirms the artwork photo, not the shipping-label QR or buyer avatar', () => {
+  // This is the image layout used by real Depop sale-confirmation emails.
+  const html = [
+    '<img src="https://braze-images.com/appboy/communication/assets/logo.png" alt="Depop" width="296" height="38">',
+    '<img src="https://shipping-labels.depop.com/qr-codes/label.png" alt="Image" width="320" height="350">',
+    '<!-- Order details -->',
+    '<img src="https://media-photos.depop.com/b1/312760533/4769037755/print/P0.jpg" alt="image" width="120" height="120">',
+    '<img src="https://media-photos.depop.com/b1/203239220/buyer/U1.jpg" alt="Buyer Profile Picture" width="32" height="32">',
+    '<!-- END Order details -->',
+  ].join('');
+  assert.equal(
+    marketplaceImageUrl('Depop', html, '3.5x5 Framed Quilled Sacred Heart Art Print'),
+    'https://media-photos.depop.com/b1/312760533/4769037755/print/P0.jpg'
+  );
+});
