@@ -155,8 +155,20 @@ export default async function handler(req, res) {
       });
     }
 
+    // Aggregate-only diagnostics help distinguish an importer issue from
+    // broken marketplace image links without logging titles or buyer details.
+    const photoStatsAfter = await depopPhotoStats();
+    console.info('Depop order photo diagnostics', {
+      orders: Number(photoStatsAfter.total) || 0,
+      photos: Number(photoStatsAfter.photos) || 0,
+      scanned,
+      parsed,
+      imported,
+      rateLimited,
+      repair: depopPhotosOnly,
+    });
+
     if (depopPhotosOnly) {
-      const photoStatsAfter = await depopPhotoStats();
       const total = Number(photoStatsAfter.total) || 0;
       const photos = Number(photoStatsAfter.photos) || 0;
       const recovered = Math.max(0, photos - (Number(photoStatsBefore?.photos) || 0));
