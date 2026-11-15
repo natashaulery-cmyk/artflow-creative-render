@@ -227,10 +227,11 @@ export default function Orders() {
       /\bbundle\b/i.test(String(order?.product_name || "")) ||
       Number(order?.quantity || 1) > 1;
 
-    if (bundleOrder) return "/bundle-placeholder.svg";
+    const platform = displayPlatform(order?.platform);
+    // A Depop bundle can still show its first sold-item photo.
+    if (bundleOrder && platform !== "Depop") return "/bundle-placeholder.svg";
 
     const direct = String(directImageUrl(order) || "").trim();
-    const platform = displayPlatform(order?.platform);
     const listing = String(order?.source_url || "").trim();
 
     if (platform === "Mercari") return mercariArtworkUrl(order, direct);
@@ -262,7 +263,7 @@ export default function Orders() {
         if (isProductListing) params.set("listing", listing);
         return `/api/listing-image?${params.toString()}`;
       }
-      return direct || "";
+      return direct || (bundleOrder ? "/bundle-placeholder.svg" : "");
     }
 
     if (platform === "eBay") {
