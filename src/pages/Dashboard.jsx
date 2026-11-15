@@ -97,22 +97,33 @@ const expenseDate = (expense) =>
   expense?.created_at ||
   "";
 
-function DashboardThumbnail({ src, alt = "", fallback = "Art" }) {
+function DashboardThumbnail({ src, fallbackSrc = "", alt = "", fallback = "Art" }) {
   const [failed, setFailed] = useState(false);
-  // If a repaired sale receives a new image URL, do not leave the old
-  // failed-loading state stuck on its thumbnail.
-  useEffect(() => setFailed(false), [src]);
-  const usable = Boolean(src) && !failed;
+  const [currentSrc, setCurrentSrc] = useState(src);
+  // Try a different photo when the original marketplace image expires.
+  useEffect(() => {
+    setFailed(false);
+    setCurrentSrc(src || fallbackSrc);
+  }, [src, fallbackSrc]);
+  const usable = Boolean(currentSrc) && !failed;
+  const onPhotoError = () => {
+    if (fallbackSrc && currentSrc !== fallbackSrc) {
+      setCurrentSrc(fallbackSrc);
+    } else {
+      setFailed(true);
+    }
+  };
 
   return (
     <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-purple-100/70 dark:border-white/10 bg-gradient-to-br from-purple-100 via-pink-50 to-cyan-50 flex items-center justify-center">
       {usable ? (
         <img
-          src={src}
+          src={currentSrc}
           alt={alt}
           loading="lazy"
+          referrerPolicy="no-referrer"
           className="w-full h-full object-cover"
-          onError={() => setFailed(true)}
+          onError={onPhotoError}
         />
       ) : (
         <span className="text-[9px] font-semibold text-purple-600/80 px-1 text-center">
@@ -487,7 +498,7 @@ export default function Dashboard() {
   }, [marketplaceListings, inventory]);
 
   const imageForOrder = React.useCallback(
-    (order) => {
+    (order, skipDirect = false) => {
       const bundleOrder =
         /\bbundle\b/i.test(String(orderTitle(order))) ||
         Number(order?.quantity || 1) > 1;
@@ -500,8 +511,8 @@ export default function Dashboard() {
       const badDepopGraphic = platform === "Depop" &&
         /shipping-labels[.]depop[.]com|qr-codes\/|braze-images[.]com|buyer.profile/i.test(rawImage);
       const direct = badDepopGraphic ? "" : rawImage;
-      if (platform === "Mercari") return mercariArtworkUrl(order, direct);
-      if (direct) return direct;
+      if (!skipDirect && platform === "Mercari") return mercariArtworkUrl(order, direct);
+      if (!skipDirect && direct) return direct;
 
       const source = String(order?.source_url || order?.data?.source_url || "").trim();
       if (source && imageSources.listingByUrl.has(source)) {
@@ -734,6 +745,9 @@ export default function Dashboard() {
       .map((order) => ({
         ...order,
         dashboard_image_url: imageForOrder(order),
+        dashboard_fallback_image_url: displayPlatform(order?.platform) === "Depop"
+          ? imageForOrder(order, true)
+          : "",
       }));
 
     const inventoryPreview = [...inventory]
@@ -1191,6 +1205,7 @@ export default function Dashboard() {
                   >
                     <DashboardThumbnail
                       src={order.dashboard_image_url}
+                      fallbackSrc={order.dashboard_fallback_image_url}
                       alt={orderTitle(order)}
                       fallback="Order"
                     />
