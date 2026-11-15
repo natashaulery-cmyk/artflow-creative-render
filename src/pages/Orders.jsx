@@ -247,6 +247,23 @@ export default function Orders() {
       return "";
     }
 
+    if (platform === "Depop") {
+      // Saved Depop photos can reject hotlinking after a sale. Use the existing
+      // image proxy and, if the email linked to the specific product, let it
+      // recover that product's thumbnail when the direct photo is missing.
+      const isProductListing = /^https:\/\/(?:www\.)?depop\.com\/products\/[^/?#]+/i.test(listing);
+      const isDepopImage = /^https:\/\/(?:[^/]+\.)?depop\.com\//i.test(direct);
+      const isDepopCdn = /^https:\/\/(?:di2ponv0v5otw|d2zlsagv0ouax1)\.cloudfront\.net\//i.test(direct);
+
+      if (isDepopImage || isDepopCdn || (!direct && isProductListing)) {
+        const params = new URLSearchParams();
+        if (direct) params.set("image", direct);
+        if (isProductListing) params.set("listing", listing);
+        return `/api/listing-image?${params.toString()}`;
+      }
+      return direct || "";
+    }
+
     if (platform === "eBay") {
       const badGraphic =
         /ebaystatic\.com|app[ _-]?store|google[ _-]?play|download[^/ ]*app/i.test(direct);
