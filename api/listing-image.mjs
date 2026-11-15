@@ -187,7 +187,12 @@ export default async function handler(req, res) {
 
     return res.status(404).end();
   } catch (error) {
-    console.warn('listing image proxy failed', error?.message || error);
+    console.warn('listing image proxy failed', {
+      imageHost: image?.hostname || '',
+      listingHost: listing?.hostname || '',
+      error: error?.message || 'unknown',
+      cause: error?.cause?.code || '',
+    });
     return res.status(502).end();
   }
 }
