@@ -701,11 +701,11 @@ export const GMAIL_QUERIES = [
   `from:no-reply@alerts.us.mercari.com subject:"made a sale" after:${GMAIL_YEAR_START}`,
 ];
 
-async function listMessageIds(accessToken) {
+async function listMessageIds(accessToken, queries = GMAIL_QUERIES) {
   // A short, rotating search across marketplaces keeps one busy marketplace
   // from consuming the full Gmail request budget before others are checked.
   const groups = [];
-  for (const query of GMAIL_QUERIES) {
+  for (const query of queries) {
     const ids = [];
     let pageToken = '';
     for (let page = 0; page < 2; page += 1) {
@@ -916,7 +916,7 @@ async function archiveLegacyDepopBundleRows(client, businessId, messageId, rows)
 // Sync one Gmail mailbox into the given business workspace. Returns the counts
 // the callers aggregate for their status responses. Permission problems are
 // reported via reconnectRequired instead of throwing; other errors bubble up.
-export async function syncGmailAccount(client, business, accessToken, { force = false } = {}) {
+export async function syncGmailAccount(client, business, accessToken, { force = false, depopPhotosOnly = false } = {}) {
   const result = { matched: 0, scanned: 0, parsed: 0, imported: 0, canceled: 0, reconnectRequired: false, throttled: false, gmailAddress: '' };
   if (!business?.base44_id) return result;
 
@@ -961,8 +961,9 @@ export async function syncGmailAccount(client, business, accessToken, { force = 
      WHERE business_id=$1
        AND sync_source='gmail_direct_sales'
        AND COALESCE(source_email_id,'')<>''
+       AND ($2::boolean IS NOT TRUE OR platform='Depop')
        AND (
-         COALESCE(data->>'source_image_parser_version','') <> '1'
+         COALESCE(data->>'source_image_parser_version','') <> CASE WHEN platform='Depop' THEN '3' ELSE '1' END
          OR (
            platform='Poshmark'
            AND (
@@ -987,16 +988,17 @@ export async function syncGmailAccount(client, business, accessToken, { force = 
          )
        )
      ORDER BY 1
-  `, [business.base44_id]);
+  `, [business.base44_id, depopPhotosOnly]);
   const repairMessageIds = repairCandidates.rows
     .map((row) => clean(row.message_id))
     .filter(Boolean);
 
   // If a full repair batch is already known, skip the expensive mailbox list
   // queries on this run. The next automatic/manual sync continues the backlog.
+  const depopQueries = GMAIL_QUERIES.filter((query) => query.includes('depop.com'));
   const messageIds = !force && repairMessageIds.length >= 200
     ? []
-    : await listMessageIds(accessToken);
+    : await listMessageIds(accessToken, depopPhotosOnly ? depopQueries : GMAIL_QUERIES);
 
   const completed = await client.query(`
     SELECT message_id
@@ -1046,11 +1048,10 @@ export async function syncGmailAccount(client, business, accessToken, { force = 
   `, [business.base44_id]);
   const existingIds = new Set(existingMessages.rows.map((row) => clean(row.message_id)).filter(Boolean));
   const freshIds = messageIds.filter((id) => !existingIds.has(id) && !completedIds.has(id));
-  const pendingMessageIds = Array.from(new Set([
-    ...freshIds,
-    ...repairMessageIds,
-    ...messageIds.filter((id) => !completedIds.has(id)),
-  ])).slice(0, force ? 40 : 30);
+  const pendingMessageIds = Array.from(new Set(depopPhotosOnly
+    ? [...repairMessageIds, ...freshIds, ...messageIds.filter((id) => !completedIds.has(id))]
+    : [...freshIds, ...repairMessageIds, ...messageIds.filter((id) => !completedIds.has(id))]
+  )).slice(0, depopPhotosOnly ? 20 : force ? 40 : 30);
   result.scanned = pendingMessageIds.length;
   for (let index = 0; index < pendingMessageIds.length; index += 10) {
     const batchIds = pendingMessageIds.slice(index, index + 10);
@@ -1093,7 +1094,7 @@ export async function syncGmailAccount(client, business, accessToken, { force = 
       // never saved as $0 merely because Gmail's plain part was incomplete.
       const combinedText = [text, html ? htmlToText(html) : ''].filter(Boolean).join('\n');
       const rows = parseSaleEmail(from, subject, combinedText, trustedForwarder);
-      if (!rows.length) continue;
+      if (!rows.length || (depopPhotosOnly && rows.some((row) => row.platform !== 'Depop'))) continue;
       for (const row of rows) {
         if (row.platform === 'Poshmark' && /^[a-f0-9]{24}$/i.test(clean(row.order_id))) {
           row.source_url = `https://poshmark.com/order/sales/${clean(row.order_id)}`;
