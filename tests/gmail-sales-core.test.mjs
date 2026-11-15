@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { GMAIL_QUERIES, parsePoshmarkCancellation, parseSaleEmail } from '../api/_gmail-sales-core.mjs';
+import { GMAIL_QUERIES, marketplaceImageUrl, parsePoshmarkCancellation, parseSaleEmail } from '../api/_gmail-sales-core.mjs';
 
 test('parses a multiline Poshmark sold email with the full item price', () => {
   const rows = parseSaleEmail(
@@ -404,4 +404,23 @@ test('parses eBay Sold label format with shipping shown separately', () => {
   assert.equal(rows[0].buyer, 'lunchbox_1313');
   assert.equal(rows[0].quantity, 1);
   assert.equal(rows[0].amount_pending, false);
+});
+
+test('recovers the actual Depop sold-item photo from a lazy-loaded email image', () => {
+  const html = [
+    '<img src="https://www.depop.com/assets/depop_logo.png" alt="Depop" width="50" height="50">',
+    '<img src="cid:placeholder" data-src="https://media.depop.com/images/8x10-moth.jpg" alt="image 8x10 Gothic Moth Print" width="250" height="250">',
+  ].join('');
+  assert.equal(
+    marketplaceImageUrl('Depop', html, '8x10 Gothic Moth Print'),
+    'https://media.depop.com/images/8x10-moth.jpg'
+  );
+});
+
+test('recovers a Depop sale photo from srcset when src is unavailable', () => {
+  const html = '<img src="cid:placeholder" srcset="https://media.depop.com/images/rose-small.jpg 1x, https://media.depop.com/images/rose-large.jpg 2x" alt="5x7 Gothic Rose" width="200" height="200">';
+  assert.equal(
+    marketplaceImageUrl('Depop', html, '5x7 Gothic Rose'),
+    'https://media.depop.com/images/rose-small.jpg'
+  );
 });
