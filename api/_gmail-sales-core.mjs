@@ -831,7 +831,7 @@ async function insertRows(client, businessId, messageId, receivedAt, rows) {
                AND COALESCE(NULLIF($7::jsonb->>'image_url',''),'')<>''
                AND (
                  COALESCE(data->>'image_url','')=''
-                 OR COALESCE(data->>'image_url','') ~* '(shipping-labels\\.depop\\.com|qr-codes/|braze-images\\.com)'
+                 OR COALESCE(data->>'image_url','') ~* '(shipping-labels[.]depop[.]com|qr-codes/|braze-images[.]com)'
                )
              )
            )
