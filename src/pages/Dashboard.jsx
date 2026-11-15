@@ -99,6 +99,9 @@ const expenseDate = (expense) =>
 
 function DashboardThumbnail({ src, alt = "", fallback = "Art" }) {
   const [failed, setFailed] = useState(false);
+  // If a repaired sale receives a new image URL, do not leave the old
+  // failed-loading state stuck on its thumbnail.
+  useEffect(() => setFailed(false), [src]);
   const usable = Boolean(src) && !failed;
 
   return (
@@ -483,26 +486,21 @@ export default function Dashboard() {
     return { listingByUrl, listingByKey, inventoryByKey };
   }, [marketplaceListings, inventory]);
 
-  const actualOrderImage = React.useCallback((order) => {
-    const bundleOrder =
-      /\bbundle\b/i.test(String(orderTitle(order))) ||
-      Number(order?.quantity || 1) > 1;
-
-    if (bundleOrder) return "/bundle-placeholder.svg";
-
-    const direct = directImageUrl(order);
-    return displayPlatform(order?.platform) === "Mercari" ? mercariArtworkUrl(order, direct) : (direct || "");
-  }, []);
-
   const imageForOrder = React.useCallback(
     (order) => {
       const bundleOrder =
         /\bbundle\b/i.test(String(orderTitle(order))) ||
         Number(order?.quantity || 1) > 1;
-      if (bundleOrder) return "/bundle-placeholder.svg";
+      const platform = displayPlatform(order?.platform);
+      if (bundleOrder && platform !== "Depop") return "/bundle-placeholder.svg";
 
-      const direct = directImageUrl(order);
-      if (displayPlatform(order?.platform) === "Mercari") return mercariArtworkUrl(order, direct);
+      const rawImage = String(directImageUrl(order) || "").trim();
+      // Old Depop imports sometimes contain a shipping QR or email asset
+      // instead of the sold-item picture. Fall back to saved listing/inventory.
+      const badDepopGraphic = platform === "Depop" &&
+        /shipping-labels[.]depop[.]com|qr-codes\/|braze-images[.]com|buyer.profile/i.test(rawImage);
+      const direct = badDepopGraphic ? "" : rawImage;
+      if (platform === "Mercari") return mercariArtworkUrl(order, direct);
       if (direct) return direct;
 
       const source = String(order?.source_url || order?.data?.source_url || "").trim();
@@ -527,7 +525,7 @@ export default function Dashboard() {
         }
       }
 
-      return "";
+      return bundleOrder ? "/bundle-placeholder.svg" : "";
     },
     [imageSources]
   );
@@ -735,7 +733,7 @@ export default function Dashboard() {
       .slice(0, 5)
       .map((order) => ({
         ...order,
-        dashboard_image_url: actualOrderImage(order),
+        dashboard_image_url: imageForOrder(order),
       }));
 
     const inventoryPreview = [...inventory]
@@ -810,7 +808,6 @@ export default function Dashboard() {
     inventory,
     currentMonth,
     imageForOrder,
-    actualOrderImage,
   ]);
 
   const refresh = async () => {
