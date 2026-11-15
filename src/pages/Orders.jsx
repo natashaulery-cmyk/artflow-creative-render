@@ -33,22 +33,35 @@ const directImageUrl = (item = {}) =>
   item?.data?.photo_url ||
   "";
 
-function OrderThumbnail({ src, alt }) {
+function OrderThumbnail({ src, alt, fallbackSrc = "" }) {
   const [failed, setFailed] = useState(false);
+  const [currentSrc, setCurrentSrc] = useState(src);
 
   useEffect(() => {
     setFailed(false);
-  }, [src]);
+    setCurrentSrc(src);
+  }, [src, fallbackSrc]);
+
+  const tryFallback = () => {
+    // The Render-side image proxy sometimes cannot reach Depop's CDN.
+    // The original photo can still load directly in the user's browser.
+    if (fallbackSrc && fallbackSrc !== currentSrc) {
+      setCurrentSrc(fallbackSrc);
+    } else {
+      setFailed(true);
+    }
+  };
 
   return (
     <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0 border border-[hsl(var(--border))] bg-muted flex items-center justify-center">
-      {src && !failed ? (
+      {currentSrc && !failed ? (
         <img
-          src={src}
+          src={currentSrc}
           alt={alt || "Order artwork"}
           loading="lazy"
+          referrerPolicy="no-referrer"
           className="w-full h-full object-cover"
-          onError={() => setFailed(true)}
+          onError={tryFallback}
         />
       ) : (
         <ImageIcon className="w-6 h-6 text-muted-foreground/60" />
@@ -292,11 +305,11 @@ export default function Orders() {
       const isDepopImage = /^https:\/\/(?:[^/]+\.)?depop\.com\//i.test(direct);
       const isDepopCdn = /^https:\/\/(?:di2ponv0v5otw|d2zlsagv0ouax1)\.cloudfront\.net\//i.test(direct);
 
-      if (isDepopImage || isDepopCdn || (!direct && isProductListing)) {
-        const params = new URLSearchParams();
-        if (direct) params.set("image", direct);
-        if (isProductListing) params.set("listing", listing);
-        return `/api/listing-image?${params.toString()}`;
+      // Serve the original photo directly first. Render's image proxy has
+      // reported fetch failures for Depop CDN files, leaving blank thumbnails.
+      if (direct && (isDepopImage || isDepopCdn)) return direct;
+      if (!direct && isProductListing) {
+        return `/api/listing-image?listing=${encodeURIComponent(listing)}`;
       }
       return direct || (bundleOrder ? "/bundle-placeholder.svg" : "");
     }
@@ -500,6 +513,11 @@ export default function Orders() {
               <OrderThumbnail
                 src={o.display_image_url}
                 alt={displayProductName(o)}
+                fallbackSrc={
+                  displayPlatform(o.platform) === "Depop" && directImageUrl(o)
+                    ? `/api/listing-image?image=${encodeURIComponent(directImageUrl(o))}`
+                    : ""
+                }
               />
 
               <div className="min-w-0 flex-1">
