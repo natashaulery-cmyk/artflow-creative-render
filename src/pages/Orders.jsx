@@ -84,6 +84,7 @@ export default function Orders() {
   }, [pathname, locationSearch, reloadOrders]);
   const { isOpen: formOpen, open: openForm, close: closeForm } = useModalRoute();
   const [importingEmail, setImportingEmail] = useState(false);
+  const [repairingDepop, setRepairingDepop] = useState(false);
   const [updatingShipment, setUpdatingShipment] = useState(() => new Set());
 
   const updateShipment = async (order, shipped) => {
@@ -186,6 +187,40 @@ export default function Orders() {
       toast.error("Sales sync failed", { description: e?.message });
     } finally {
       setImportingEmail(false);
+    }
+  };
+
+  const repairDepopPhotos = async () => {
+    if (repairingDepop) return;
+    setRepairingDepop(true);
+    try {
+      const response = await fetch("/api/gmail-sales-sync", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force: true, depop_photos_only: true }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Could not repair Depop photos. Check your Gmail connection under Account.");
+      }
+      await reloadOrders();
+      if (Number(data.recovered || 0) > 0) {
+        toast.success("Depop photos recovered", { description: data.message });
+      } else {
+        toast.info("Depop photo check finished", {
+          description: data.message || "No missing sold-item photos could be recovered from the connected Gmail account.",
+          duration: 8000,
+        });
+      }
+    } catch (error) {
+      toast.error("Depop photo repair needs attention", {
+        description: error?.message || "Check Gmail under Account, then try repairing photos.",
+        duration: 8000,
+      });
+    } finally {
+      setRepairingDepop(false);
     }
   };
 
@@ -384,6 +419,17 @@ export default function Orders() {
           <RefreshCw className={`w-4 h-4 ${importingEmail ? "animate-spin" : ""}`} />
           {importingEmail ? "Syncing all sales…" : "Sync All Sales Now"}
         </button>
+        {activeOrders.some((order) => displayPlatform(order?.platform) === "Depop") && (
+          <button
+            type="button"
+            onClick={repairDepopPhotos}
+            disabled={repairingDepop}
+            className="w-full min-h-12 px-3 rounded-2xl bg-muted text-foreground flex items-center justify-center gap-2 text-sm font-semibold disabled:opacity-60"
+          >
+            <ImageIcon className="w-4 h-4" />
+            {repairingDepop ? "Checking Depop sale photos…" : "Repair Depop Sale Photos"}
+          </button>
+        )}
       </div>
 
       <div className="relative">
