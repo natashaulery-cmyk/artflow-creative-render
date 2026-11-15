@@ -249,6 +249,22 @@ export default function Orders() {
       return "";
     }
 
+    if (platform === "Depop") {
+      // Depop images can reject browser hotlinking after a sale. Proxy known
+      // CDN photos and recover the thumbnail from a product link if necessary.
+      const isProductListing = /^https:\/\/(?:www\.)?depop\.com\/products\/[^/?#]+/i.test(listing);
+      const isDepopImage = /^https:\/\/(?:[^/]+\.)?depop\.com\//i.test(direct);
+      const isDepopCdn = /^https:\/\/(?:di2ponv0v5otw|d2zlsagv0ouax1)\.cloudfront\.net\//i.test(direct);
+
+      if (isDepopImage || isDepopCdn || (!direct && isProductListing)) {
+        const params = new URLSearchParams();
+        if (direct) params.set("image", direct);
+        if (isProductListing) params.set("listing", listing);
+        return `/api/listing-image?${params.toString()}`;
+      }
+      return direct || "";
+    }
+
     if (platform === "eBay") {
       const badGraphic =
         /ebaystatic\.com|app[ _-]?store|google[ _-]?play|download[^/ ]*app/i.test(direct);
