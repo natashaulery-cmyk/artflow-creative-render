@@ -35,6 +35,18 @@ export default async function handler(req, res) {
     if (!business?.base44_id) return res.status(400).json({ error: 'No Art Flow business workspace was found.' });
 
     const force = req.method === 'POST' && Boolean(req.body?.force);
+    const depopPhotosOnly = req.method === 'POST' && req.body?.depop_photos_only === true;
+    const depopPhotoStats = async () => {
+      const result = await client.query(`
+        SELECT count(*)::int AS total,
+               count(*) FILTER (WHERE COALESCE(data->>'image_url','') ~*
+                 '^https://(media(-photos)?[.]depop[.]com|[^/]+[.]cloudfront[.]net)/')::int AS photos
+        FROM artflow.orders
+        WHERE business_id=$1 AND archived IS NOT TRUE AND lower(platform)='depop'
+      `, [business.base44_id]);
+      return result.rows[0] || { total: 0, photos: 0 };
+    };
+    const photoStatsBefore = depopPhotosOnly ? await depopPhotoStats() : null;
 
     const accounts = await auth.api.listUserAccounts({ headers: fromNodeHeaders(req.headers) });
     const googleAccounts = (accounts || []).filter((account) => account.providerId === 'google' && account.id);
@@ -95,11 +107,12 @@ export default async function handler(req, res) {
     let scanned = 0;
     let parsed = 0;
     let imported = 0;
+    let rateLimited = false;
 
     for (const account of googleAccounts) {
       try {
         const accessToken = await accessTokenForAccount(req, account.id);
-        const result = await syncGmailAccount(client, business, accessToken, { force });
+        const result = await syncGmailAccount(client, business, accessToken, { force, depopPhotosOnly });
         if (result.reconnectRequired) {
           permissionErrors += 1;
           continue;
@@ -109,6 +122,7 @@ export default async function handler(req, res) {
         scanned += result.scanned;
         parsed += result.parsed;
         imported += result.imported;
+        rateLimited = rateLimited || result.throttled;
       } catch (error) {
         if (error?.code === 'GMAIL_RECONNECT' || error?.status === 401) {
           permissionErrors += 1;
@@ -138,6 +152,26 @@ export default async function handler(req, res) {
       return res.status(409).json({
         error: 'The connected Google account is not listed as a sales email for this business.',
         code: 'GMAIL_NOT_APPROVED',
+      });
+    }
+
+    if (depopPhotosOnly) {
+      const photoStatsAfter = await depopPhotoStats();
+      const total = Number(photoStatsAfter.total) || 0;
+      const photos = Number(photoStatsAfter.photos) || 0;
+      const recovered = Math.max(0, photos - (Number(photoStatsBefore?.photos) || 0));
+      return res.status(200).json({
+        ok: true,
+        accounts: matchedAccounts,
+        scanned,
+        recovered,
+        photos,
+        total,
+        remaining: Math.max(0, total - photos),
+        throttled: rateLimited,
+        message: rateLimited
+          ? `Google paused Gmail requests because of its quota. ${recovered} photos recovered; ${photos} of ${total} Depop photos saved so far.`
+          : `Checked ${scanned} Depop sale emails. ${recovered} photos recovered; ${photos} of ${total} Depop photos saved.`,
       });
     }
 
