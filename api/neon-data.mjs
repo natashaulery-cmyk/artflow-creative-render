@@ -341,7 +341,7 @@ async function listOrders(client, session) {
          NULLIF(data->>'thumbnail_url',''),
          NULLIF(data->>'photo_url',''),
          CASE
-           WHEN lower(COALESCE(platform,''))='ebay' THEN (
+           WHEN lower(COALESCE(platform,'')) IN ('ebay','depop') THEN (
              SELECT COALESCE(
                NULLIF(img.data->>'image_url',''),
                NULLIF(img.data->>'product_image_url',''),
@@ -350,7 +350,7 @@ async function listOrders(client, session) {
                NULLIF(img.data->>'photo_url','')
              )
              FROM scoped_orders img
-             WHERE lower(COALESCE(img.platform,''))='ebay'
+             WHERE lower(COALESCE(img.platform,''))=lower(COALESCE(deduped_orders.platform,''))
                AND img.dedupe_day=deduped_orders.dedupe_day
                AND img.dedupe_qty=deduped_orders.dedupe_qty
                AND img.dedupe_title<>''
@@ -378,11 +378,11 @@ async function listOrders(client, session) {
            )
          END,
          CASE
-           WHEN lower(COALESCE(platform,''))='ebay' THEN (
+           WHEN lower(COALESCE(platform,'')) IN ('ebay','depop') THEN (
              SELECT NULLIF(ml.image_url,'')
              FROM artflow.marketplace_listings ml
              WHERE ml.business_id = ANY($3::text[])
-               AND lower(COALESCE(ml.platform,''))='ebay'
+               AND lower(COALESCE(ml.platform,''))=lower(COALESCE(deduped_orders.platform,''))
                AND COALESCE(ml.image_url,'')<>''
                AND deduped_orders.dedupe_title<>''
                AND (
